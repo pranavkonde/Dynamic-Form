@@ -9,7 +9,7 @@ export const formData = {
           "maxLength": 10,
           "required": true,
           "errorMessage": {
-            "pattern": "Name should not contain numbers",
+            "pattern": "Name should not contain numbers and spaces",
             "maxLength": "First name cannot exceed 10 characters",
             "required": "Please enter your first name"
           }
@@ -24,7 +24,7 @@ export const formData = {
           "maxLength": 10,
           "required": true,
           "errorMessage": {
-            "pattern": "Last name should not contain numbers",
+            "pattern": "Last name should not contain numbers and spaces",
             "maxLength": "Last name cannot exceed 10 characters",
             "required": "Please enter your last name"
           }

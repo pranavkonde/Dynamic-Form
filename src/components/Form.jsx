@@ -1,339 +1,313 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import axios from "axios";
+import { formData as dynamicFormData } from "../formData";
 
 const Form = () => {
-  const [formData, setFormData] = useState({
-    firstName: "",
-    lastName: "",
-    phoneNumber: "",
-    email: "",
-    gender: "",
-    languages: [],
-    state: "",
-    hasMedicalConditions: "",
-    medicalConditions: "",
-  });
+  const [formData, setFormData] = useState(
+    dynamicFormData.fields.reduce((acc, field) => {
+      acc[field.name] = field.type === "checkbox" ? [] : "";
+      return acc;
+    }, {})
+  );
 
-  const handleSubmit = async (event) => {
-    event.preventDefault();
+  const [errors, setErrors] = useState({});
+  const [submittedData, setSubmittedData] = useState([]);
+  const [activeAccordion, setActiveAccordion] = useState(null);
+  const [isEditing, setIsEditing] = useState(null);
+
+  useEffect(() => {
+    const savedDraft = localStorage.getItem("formDraft");
+    if (savedDraft) {
+      setFormData(JSON.parse(savedDraft));
+    }
+  }, []);
+
+  const handleInputChange = (e) => {
+    const { name, value, type, checked } = e.target;
+
+    if (type === "checkbox") {
+      setFormData((prev) => ({
+        ...prev,
+        [name]: checked
+          ? [...prev[name], value]
+          : prev[name].filter((v) => v !== value),
+      }));
+    } else {
+      setFormData((prev) => ({ ...prev, [name]: value }));
+    }
+  };
+
+  const validateField = (field) => {
+    const value = formData[field.name];
+    const { validation } = field;
+
+    if (validation?.required && !value) {
+      return validation.errorMessage.required;
+    }
+    if (validation?.pattern && !new RegExp(validation.pattern).test(value)) {
+      return validation.errorMessage.pattern;
+    }
+    if (validation?.maxLength && value.length > validation.maxLength) {
+      return validation.errorMessage.maxLength;
+    }
+
+    return null;
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    const newErrors = {};
+
+    dynamicFormData.fields.forEach((field) => {
+      const error = validateField(field);
+      if (error) {
+        newErrors[field.name] = error;
+      }
+    });
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
+    }
 
     try {
-      const collectedData = {
-        ...formData,
-        medicalConditions: formData.hasMedicalConditions
-          ? formData.medicalConditions
-          : null,
-      };
+      if (isEditing) {
+        await axios.put(
+          `https://66fbd3be8583ac93b40d6030.mockapi.io/formData/${isEditing}`,
+          formData
+        );
+        alert("Form data updated successfully!");
+      } else {
+        await axios.post(
+          "https://66fbd3be8583ac93b40d6030.mockapi.io/formData",
+          formData
+        );
+        alert("Form submitted successfully!");
+      }
 
-      await axios.post(
-        "https://66fbd3be8583ac93b40d6030.mockapi.io/formData",
-        collectedData
+      localStorage.removeItem("formDraft");
+      setFormData(
+        dynamicFormData.fields.reduce((acc, field) => {
+          acc[field.name] = field.type === "checkbox" ? [] : "";
+          return acc;
+        }, {})
       );
-
-      setFormData({
-        firstName: "",
-        lastName: "",
-        phoneNumber: "",
-        email: "",
-        gender: "",
-        languages: [],
-        state: "",
-        hasMedicalConditions: false,
-        medicalConditions: "",
-      });
-
-      alert("Form submitted successfully!");
+      setIsEditing(null);
+      fetchAllData();
     } catch (error) {
       console.error("Error submitting form:", error);
       alert("Failed to submit form. Please try again.");
     }
   };
 
-  const handleInputChange = (event) => {
-    const { name, value } = event.target;
+  const saveDraft = () => {
+    localStorage.setItem("formDraft", JSON.stringify(formData));
+    alert("Form data saved as draft!");
+  };
 
-    switch (name) {
-      case "gender":
-        setFormData((prev) => ({ ...prev, gender: value }));
-        break;
-      case "languages":
-        setFormData((prev) => ({
-          ...prev,
-          languages: prev.languages.includes(value)
-            ? prev.languages.filter((lang) => lang !== value)
-            : [...prev.languages, value],
-        }));
-        break;
-      case "hasMedicalConditions":
-        setFormData((prev) => ({
-          ...prev,
-          hasMedicalConditions: value === "true",
-        }));
-        break;
+  const fetchAllData = async () => {
+    try {
+      const response = await axios.get(
+        "https://66fbd3be8583ac93b40d6030.mockapi.io/formData"
+      );
+      setSubmittedData(response.data);
+    } catch (error) {
+      console.error("Error fetching data:", error);
+      alert("Failed to fetch data. Please try again.");
+    }
+  };
+
+  const toggleAccordion = (index) => {
+    setActiveAccordion(activeAccordion === index ? null : index);
+  };
+
+  const handleEdit = (data) => {
+    setFormData(data);
+    setIsEditing(data.id);
+  };
+
+  const handleDelete = async (id) => {
+    try {
+      await axios.delete(`https://66fbd3be8583ac93b40d6030.mockapi.io/formData/${id}`);
+      alert("Form data deleted successfully!");
+      fetchAllData(); 
+    } catch (error) {
+      console.error("Error deleting data:", error);
+      alert("Failed to delete data. Please try again.");
+    }
+  };
+
+  const renderInput = (field) => {
+    const { type, name, label, options } = field;
+
+    switch (type) {
+      case "text":
+      case "email":
+      case "tel":
+        return (
+          <div key={name} className="mb-4">
+            <label htmlFor={name} className="block mb-2 text-sm font-medium">
+              {label}
+            </label>
+            <input
+              type={type}
+              id={name}
+              value={formData[name]}
+              onChange={handleInputChange}
+              name={name}
+              className="bg-gray-50 border border-gray-300 text-sm rounded-lg w-full p-2.5"
+            />
+            {errors[name] && <p className="text-red-600">{errors[name]}</p>}
+          </div>
+        );
+
+      case "radio":
+        return (
+          <div key={name} className="mb-4">
+            <label className="block mb-2 text-sm font-medium">{label}</label>
+            <div className="flex space-x-4">
+              {options.map((option, idx) => (
+                <div key={idx} className="flex items-center">
+                  <input
+                    type="radio"
+                    id={`${name}-${option.value}`}
+                    name={name}
+                    value={option.value}
+                    checked={formData[name] === option.value}
+                    onChange={handleInputChange}
+                    className="w-4 h-4"
+                  />
+                  <label htmlFor={`${name}-${option.value}`} className="ml-2">
+                    {option.label}
+                  </label>
+                </div>
+              ))}
+            </div>
+            {errors[name] && <p className="text-red-600">{errors[name]}</p>}
+          </div>
+        );
+
+      case "checkbox":
+        return (
+          <div key={name} className="mb-4">
+            <label className="block mb-2 text-sm font-medium">{label}</label>
+            <div className="flex flex-wrap gap-2">
+              {options.map((option, idx) => (
+                <div key={idx} className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id={`${name}-${option.value}`}
+                    name={name}
+                    value={option.value}
+                    checked={formData[name]?.includes(option.value)}
+                    onChange={handleInputChange}
+                    className="w-4 h-4"
+                  />
+                  <label htmlFor={`${name}-${option.value}`} className="ml-2">
+                    {option.label}
+                  </label>
+                </div>
+              ))}
+            </div>
+            {errors[name] && <p className="text-red-600">{errors[name]}</p>}
+          </div>
+        );
+
+      case "select":
+        return (
+          <div key={name} className="mb-4">
+            <label htmlFor={name} className="block mb-2 text-sm font-medium">
+              {label}
+            </label>
+            <select
+              id={name}
+              name={name}
+              value={formData[name]}
+              onChange={handleInputChange}
+              className="bg-gray-50 border border-gray-300 text-sm rounded-lg w-full p-2.5"
+            >
+              <option value="">Select {label}</option>
+              {options.map((option, idx) => (
+                <option key={idx} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            {errors[name] && <p className="text-red-600">{errors[name]}</p>}
+          </div>
+        );
+
       default:
-        setFormData((prev) => ({ ...prev, [name]: value }));
+        return null;
     }
   };
 
   return (
-    <form
-      className="bg-white p-8 shadow-md max-w-lg m-auto"
-      onSubmit={handleSubmit}
-    >
-      <div className="mb-4">
-        <label
-          htmlFor="firstName"
-          className="block mb-2 text-sm font-medium text-gray-700"
-        >
-          First Name
-        </label>
-        <input
-          type="text"
-          id="firstName"
-          className="bg-gray-50 border border-gray-300 text-sm rounded-lg w-full p-2.5"
-          required
-          value={formData.firstName}
-          onChange={handleInputChange}
-          name="firstName"
-        />
-      </div>
-
-      <div className="mb-4">
-        <label
-          htmlFor="lastName"
-          className="block mb-2 text-sm font-medium text-gray-700"
-        >
-          Last Name
-        </label>
-        <input
-          type="text"
-          id="lastName"
-          className="bg-gray-50 border border-gray-300 text-sm rounded-lg w-full p-2.5"
-          required
-          value={formData.lastName}
-          onChange={handleInputChange}
-          name="lastName"
-        />
-      </div>
-
-      <div className="mb-4">
-        <label
-          htmlFor="phoneNumber"
-          className="block mb-2 text-sm font-medium text-gray-700"
-        >
-          Phone Number
-        </label>
-        <input
-          type="tel"
-          id="phoneNumber"
-          className="bg-gray-50 border border-gray-300 text-sm rounded-lg w-full p-2.5"
-          required
-          value={formData.phoneNumber}
-          onChange={handleInputChange}
-          name="phoneNumber"
-        />
-      </div>
-
-      <div className="mb-4">
-        <label
-          htmlFor="email"
-          className="block mb-2 text-sm font-medium text-gray-700"
-        >
-          Email
-        </label>
-        <input
-          type="email"
-          id="email"
-          className="bg-gray-50 border border-gray-300 text-sm rounded-lg w-full p-2.5"
-          required
-          value={formData.email}
-          onChange={handleInputChange}
-          name="email"
-        />
-      </div>
-
-      <div className="mb-4">
-        <label className="block mb-2 text-sm font-medium text-gray-700">
-          Gender
-        </label>
-        <div className="flex space-x-4">
-          <div className="flex items-center">
-            <input
-              id="male"
-              type="radio"
-              value="Male"
-              checked={formData.gender === "Male"}
-              onChange={(e) => handleInputChange(e)}
-              className="w-4 h-4 border border-gray-300"
-              name="gender"
-            />
-            <label
-              htmlFor="male"
-              className="ml-2 text-sm font-medium text-gray-700"
-            >
-              Male
-            </label>
-          </div>
-          <div className="flex items-center">
-            <input
-              id="female"
-              type="radio"
-              value="Female"
-              checked={formData.gender === "Female"}
-              onChange={(e) => handleInputChange(e)}
-              className="w-4 h-4 border border-gray-300"
-              name="gender"
-            />
-            <label
-              htmlFor="female"
-              className="ml-2 text-sm font-medium text-gray-700"
-            >
-              Female
-            </label>
-          </div>
+    <div>
+      <form className="bg-white p-8 shadow-md max-w-lg m-auto" onSubmit={handleSubmit}>
+        {dynamicFormData.fields.map((field) => renderInput(field))}
+        <div className="flex justify-between">
+          <button
+            type="button"
+            className="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded"
+            onClick={saveDraft}
+          >
+            Save as Draft
+          </button>
+          <button
+            type="submit"
+            className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded"
+          >
+            {isEditing ? "Update" : "Submit"}
+          </button>
         </div>
-      </div>
-      <div className="mb-4">
-        <label className="block mb-2 text-sm font-medium text-gray-700">
-          Languages Spoken
-        </label>
-        <div className="flex flex-wrap gap-2">
-          {["English", "Spanish"].map((lang, index) => (
-            <div key={index} className="flex items-center">
-              <input
-                id={`language-${index}`}
-                type="checkbox"
-                checked={formData.languages.includes(lang)}
-                onChange={(e) => handleInputChange(e)}
-                className="w-4 h-4 border border-gray-300"
-                name="languages"
-                value={lang}
-              />
-              <label
-                htmlFor={`language-${index}`}
-                className="ml-2 text-sm font-medium text-gray-700"
-              >
-                {lang}
-              </label>
-            </div>
-          ))}
-        </div>
-      </div>
+      </form>
 
-      <div className="mb-4">
-        <label
-          htmlFor="state"
-          className="block mb-2 text-sm font-medium text-gray-700"
+      <div className="m-2">
+        <button
+          onClick={fetchAllData}
+          className="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded"
         >
-          State
-        </label>
-        <select
-          id="state"
-          className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white"
-          required
-          value={formData.state}
-          onChange={handleInputChange}
-          name="state"
-        >
-          <option value="">Select State</option>
-          <option value="Andhra Pradesh">Andhra Pradesh</option>
-          <option value="Arunachal Pradesh">Arunachal Pradesh</option>
-          <option value="Assam">Assam</option>
-          <option value="Bihar">Bihar</option>
-          <option value="Chhattisgarh">Chhattisgarh</option>
-          <option value="Goa">Goa</option>
-          <option value="Gujarat">Gujarat</option>
-          <option value="Haryana">Haryana</option>
-          <option value="Himachal Pradesh">Himachal Pradesh</option>
-          <option value="Jammu and Kashmir">Jammu and Kashmir</option>
-          <option value="Jharkhand">Jharkhand</option>
-          <option value="Karnataka">Karnataka</option>
-          <option value="Kerala">Kerala</option>
-          <option value="Madhya Pradesh">Madhya Pradesh</option>
-          <option value="Maharashtra">Maharashtra</option>
-          <option value="Manipur">Manipur</option>
-          <option value="Meghalaya">Meghalaya</option>
-          <option value="Mizoram">Mizoram</option>
-          <option value="Nagaland">Nagaland</option>
-          <option value="Odisha">Odisha</option>
-          <option value="Punjab">Punjab</option>
-          <option value="Rajasthan">Rajasthan</option>
-          <option value="Sikkim">Sikkim</option>
-          <option value="Tamil Nadu">Tamil Nadu</option>
-          <option value="Tripura">Tripura</option>
-          <option value="Telangana">Telangana</option>
-          <option value="Uttarakhand">Uttarakhand</option>
-          <option value="Uttar Pradesh">Uttar Pradesh</option>
-          <option value="West Bengal">West Bengal</option>
-        </select>
-      </div>
+          Show Submitted Data
+        </button>
 
-      <div className="mb-4">
-        <label className="block mb-2 text-sm font-medium text-gray-700">
-          Do you have any medical conditions?
-        </label>
-        <div className="flex items-center space-x-4">
-          <div className="flex items-center">
-            <input
-              id="hasMedicalConditionsYes"
-              type="radio"
-              value="true"
-              checked={formData.hasMedicalConditions}
-              onChange={handleInputChange}
-              className="w-4 h-4 border border-gray-300"
-              name="hasMedicalConditions"
-            />
-            <label
-              htmlFor="hasMedicalConditionsYes"
-              className="ml-2 text-sm font-medium text-gray-700"
-            >
-              Yes
-            </label>
-          </div>
-          <div className="flex items-center">
-            <input
-              id="hasMedicalConditionsNo"
-              type="radio"
-              value="false"
-              onChange={handleInputChange}
-              className="w-4 h-4 border border-gray-300"
-              name="hasMedicalConditions"
-            />
-            <label
-              htmlFor="hasMedicalConditionsNo"
-              className="ml-2 text-sm font-medium text-gray-700"
-            >
-              No
-            </label>
-          </div>
-        </div>
-        {formData.hasMedicalConditions && (
-          <div className="mt-2">
-            <label
-              htmlFor="medicalConditions"
-              className="block mb-2 text-sm font-medium text-gray-700"
-            >
-              What are the medical conditions?
-            </label>
-            <input
-              type="text"
-              id="medicalConditions"
-              value={formData.medicalConditions}
-              onChange={handleInputChange}
-              className="bg-gray-50 border border-gray-300 text-sm rounded-lg w-full p-2.5"
-              name="medicalConditions"
-            />
+        {submittedData.length > 0 && (
+          <div className="mt-6">
+            <h2 className="text-lg font-bold mb-4">Submitted Data</h2>
+            {submittedData.map((data, idx) => (
+              <div key={idx} className="border-b mb-2">
+                <button
+                  onClick={() => toggleAccordion(idx)}
+                  className="bg-gray-200 text-gray-900 font-bold py-2 px-4 w-full text-left"
+                >
+                  {data.firstName} {data.lastName}
+                </button>
+                {activeAccordion === idx && (
+                  <div className="p-4 bg-gray-100">
+                    <pre>{JSON.stringify(data, null, 2)}</pre>
+                    <div className="flex justify-between mt-2">
+                      <button
+                        className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded"
+                        onClick={() => handleEdit(data)}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded"
+                        onClick={() => handleDelete(data.id)}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         )}
       </div>
-
-      <button
-        type="submit"
-        className="flex items-center bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded m-auto"
-      >
-        Submit
-      </button>
-    </form>
+    </div>
   );
 };
 
