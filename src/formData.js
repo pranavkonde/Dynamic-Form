@@ -134,6 +134,10 @@ export const formData = {
         "name": "medicalConditions",
         "label": "Do you have any medical conditions?",
         "type": "conditional",
+        "options": [
+          { "value": "yes", "label": "Yes" },
+          { "value": "no", "label": "No" }
+        ],
         "conditional": {
           "question": "yes",
           "field": {
@@ -149,5 +153,6 @@ export const formData = {
           }
         }
       }
+  
     ]
   }

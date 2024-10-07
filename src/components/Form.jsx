@@ -129,9 +129,11 @@ const Form = () => {
 
   const handleDelete = async (id) => {
     try {
-      await axios.delete(`https://66fbd3be8583ac93b40d6030.mockapi.io/formData/${id}`);
+      await axios.delete(
+        `https://66fbd3be8583ac93b40d6030.mockapi.io/formData/${id}`
+      );
       alert("Form data deleted successfully!");
-      fetchAllData(); 
+      fetchAllData();
     } catch (error) {
       console.error("Error deleting data:", error);
       alert("Failed to delete data. Please try again.");
@@ -139,7 +141,7 @@ const Form = () => {
   };
 
   const renderInput = (field) => {
-    const { type, name, label, options } = field;
+    const { type, name, label, options, conditional } = field;
 
     switch (type) {
       case "text":
@@ -238,6 +240,52 @@ const Form = () => {
           </div>
         );
 
+      case "conditional":
+        return (
+          <div key={name} className="mb-4">
+            <label className="block mb-2 text-sm font-medium">{label}</label>
+            <div className="flex space-x-4">
+              {options.map((option, idx) => (
+                <div key={idx} className="flex items-center">
+                  <input
+                    type="radio"
+                    id={`${name}-${option.value}`}
+                    name={name}
+                    value={option.value}
+                    checked={formData[name] === option.value}
+                    onChange={handleInputChange}
+                    className="w-4 h-4"
+                  />
+                  <label htmlFor={`${name}-${option.value}`} className="ml-2">
+                    {option.label}
+                  </label>
+                </div>
+              ))}
+            </div>
+            {formData[name] === conditional.question && (
+              <div className="mt-4">{renderInput(conditional.field)}</div>
+            )}
+            {errors[name] && <p className="text-red-600">{errors[name]}</p>}
+          </div>
+        );
+
+      case "textarea":
+        return (
+          <div key={name} className="mb-4">
+            <label htmlFor={name} className="block mb-2 text-sm font-medium">
+              {label}
+            </label>
+            <textarea
+              id={name}
+              name={name}
+              value={formData[name]}
+              onChange={handleInputChange}
+              className="bg-gray-50 border border-gray-300 text-sm rounded-lg w-full p-2.5"
+            />
+            {errors[name] && <p className="text-red-600">{errors[name]}</p>}
+          </div>
+        );
+
       default:
         return null;
     }
@@ -245,7 +293,10 @@ const Form = () => {
 
   return (
     <div>
-      <form className="bg-white p-8 shadow-md max-w-lg m-auto" onSubmit={handleSubmit}>
+      <form
+        className="bg-white p-8 shadow-md max-w-lg m-auto"
+        onSubmit={handleSubmit}
+      >
         {dynamicFormData.fields.map((field) => renderInput(field))}
         <div className="flex justify-between">
           <button
