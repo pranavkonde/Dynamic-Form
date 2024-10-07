@@ -250,7 +250,7 @@ const Form = () => {
         <div className="flex justify-between">
           <button
             type="button"
-            className="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded"
+            className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded"
             onClick={saveDraft}
           >
             Save as Draft
@@ -267,7 +267,7 @@ const Form = () => {
       <div className="m-2">
         <button
           onClick={fetchAllData}
-          className="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded"
+          className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded"
         >
           Show Submitted Data
         </button>
